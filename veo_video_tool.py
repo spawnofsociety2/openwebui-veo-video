@@ -74,7 +74,7 @@ class Tools:
             from google import genai
             from google.genai import types
 
-            credentials, _ = google.auth.default()
+            credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
 
             client = genai.Client(
                 vertexai=True,
