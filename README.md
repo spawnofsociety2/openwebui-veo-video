@@ -68,3 +68,6 @@ You can provide existing media for Veo 3.1 to use as a starting frame or referen
 - **Direct Upload (Images & Short videos)**: Click the `+` attachment icon in OpenWebUI to attach an image or short video directly to your chat message.
 - **Image URLs**: Paste a public URL to an image in your prompt, and the tool will download it automatically.
 - **GCS URI (Long/Large videos)**: For larger videos, upload the video to a Google Cloud Storage bucket and provide the `gs://your-bucket-name/video.mp4` link in your chat prompt. The tool will seamlessly hand it off to Vertex AI!
+
+### 💡 Veo 3.1 Prompting Guide
+For official tips, tricks, and best practices on prompting Veo 3.1 to get the best possible videos, check out the [Official Gemini API Veo Prompting Guide](https://ai.google.dev/gemini-api/docs/veo#prompt-guide).
