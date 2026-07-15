@@ -54,6 +54,15 @@ class Tools:
     async def generate_video(
         self,
         prompt: str,
+        reference_image_url: Optional[str] = Field(
+            default=None, 
+            description="Optional URL of a reference image to use for generating the video. Use this if the user provides an image link."
+        ),
+        reference_video_url: Optional[str] = Field(
+            default=None,
+            description="Optional URL of a reference video to edit. Use this if the user provides a video link (e.g. gs:// bucket link or public URL)."
+        ),
+        __messages__: list = None,
         __event_emitter__: Callable[[dict], Awaitable[None]] = None,
         __user__: dict = {}
     ) -> str:
@@ -83,6 +92,84 @@ class Tools:
                 credentials=credentials,
             )
 
+            # We'll collect the media parts dynamically
+            img_bytes = None
+            img_mime_type = None
+            vid_bytes = None
+            vid_mime_type = None
+            vid_gcs_uri = None
+
+            # 1. Check for reference image URL provided by the LLM
+            if reference_image_url:
+                if __event_emitter__:
+                    await __event_emitter__({
+                        "type": "status",
+                        "data": {"description": "Downloading reference image from URL...", "done": False}
+                    })
+                try:
+                    import urllib.request
+                    req = urllib.request.Request(reference_image_url, headers={'User-Agent': 'Mozilla/5.0'})
+                    with urllib.request.urlopen(req) as response:
+                        img_bytes = response.read()
+                        img_mime_type = response.headers.get_content_type()
+                except Exception as e:
+                    if __event_emitter__:
+                        await __event_emitter__({
+                            "type": "status",
+                            "data": {"description": f"Warning: Failed to fetch reference image URL: {e}", "done": False}
+                        })
+
+            # 2. Check for reference video URL provided by the LLM
+            if reference_video_url:
+                if reference_video_url.startswith("gs://"):
+                    vid_gcs_uri = reference_video_url
+                else:
+                    if __event_emitter__:
+                        await __event_emitter__({
+                            "type": "status",
+                            "data": {"description": "Downloading reference video from URL (may take a while)...", "done": False}
+                        })
+                    try:
+                        import urllib.request
+                        req = urllib.request.Request(reference_video_url, headers={'User-Agent': 'Mozilla/5.0'})
+                        with urllib.request.urlopen(req) as response:
+                            vid_bytes = response.read()
+                            vid_mime_type = response.headers.get_content_type()
+                    except Exception as e:
+                        if __event_emitter__:
+                            await __event_emitter__({
+                                "type": "status",
+                                "data": {"description": f"Warning: Failed to fetch reference video URL: {e}", "done": False}
+                            })
+
+            # 3. Check for uploaded image/video attachments in the user's last message (Open WebUI standard)
+            if __messages__:
+                last_msg = __messages__[-1]
+                if isinstance(last_msg, dict) and last_msg.get('role') == 'user':
+                    images = last_msg.get('images', [])
+                    if images:
+                        if __event_emitter__:
+                            await __event_emitter__({
+                                "type": "status",
+                                "data": {"description": f"Processing {len(images)} attached media file(s)...", "done": False}
+                            })
+                        for attachment_uri in images:
+                            if isinstance(attachment_uri, str):
+                                if attachment_uri.startswith('data:image'):
+                                    try:
+                                        header, encoded = attachment_uri.split(',', 1)
+                                        img_mime_type = header.split(';')[0].split(':')[1]
+                                        img_bytes = base64.b64decode(encoded)
+                                    except Exception as e:
+                                        pass
+                                elif attachment_uri.startswith('data:video'):
+                                    try:
+                                        header, encoded = attachment_uri.split(',', 1)
+                                        vid_mime_type = header.split(';')[0].split(':')[1]
+                                        vid_bytes = base64.b64decode(encoded)
+                                    except Exception as e:
+                                        pass
+
             # Ensure number of videos is within bounds based on the Vertex AI screenshot (1-4 usually)
             num_videos = max(1, min(4, self.user_valves.NUMBER_OF_VIDEOS))
             duration = int(self.user_valves.DURATION_SECONDS)
@@ -94,7 +181,19 @@ class Tools:
                 })
 
             def _start_generation():
-                source = types.GenerateVideosSource(prompt=prompt)
+                source_kwargs = {"prompt": prompt}
+                
+                # Attach Image if available
+                if img_bytes:
+                    source_kwargs["image"] = types.Image(image_bytes=img_bytes, mime_type=img_mime_type)
+                
+                # Attach Video if available
+                if vid_bytes:
+                    source_kwargs["video"] = types.Video(video_bytes=vid_bytes, mime_type=vid_mime_type)
+                elif vid_gcs_uri:
+                    source_kwargs["video"] = types.Video(video_uri=vid_gcs_uri, mime_type="video/mp4")
+
+                source = types.GenerateVideosSource(**source_kwargs)
                 config = types.GenerateVideosConfig(
                     aspect_ratio=self.user_valves.ASPECT_RATIO,
                     number_of_videos=num_videos,

@@ -8,6 +8,8 @@ This script fully integrates Veo 3.1's advanced long-running operations and dyna
 
 ### Features
 ✨ **Native Chat Embeds**: Videos render flawlessly inline as native HTML5 video players.
+✨ **Image-to-Video**: Upload reference images directly in the chat to use as starting frames or style references!
+✨ **Video Editing**: Edit existing videos by uploading them or providing a GCS URI (`gs://`).
 ✨ **Custom UserValves**: Includes a custom settings UI allowing each user to choose their own **Aspect Ratio** (16:9 or 9:16), **Duration** (4s, 6s, 8s), and **Resolution** (720p, 1080p, 4K)!
 ✨ **Multi-Video Support**: Set the tool to generate up to 4 videos at once, and they will all stack neatly in the chat interface!
 ✨ **Downloads**: Direct download links are automatically generated below each video.
@@ -60,3 +62,9 @@ Since OpenWebUI runs inside an isolated container, that container needs to be ha
 
 ### Usage
 Users can click the Tool Settings gear icon in their chat interface to customize their preferred aspect ratio, resolution, duration, and the number of videos to generate. Then, just mention the tool in chat with your prompt!
+
+#### Using Image & Video References
+You can provide existing media for Veo 3.1 to use as a starting frame or reference:
+- **Direct Upload (Images & Short videos)**: Click the `+` attachment icon in OpenWebUI to attach an image or short video directly to your chat message.
+- **Image URLs**: Paste a public URL to an image in your prompt, and the tool will download it automatically.
+- **GCS URI (Long/Large videos)**: For larger videos, upload the video to a Google Cloud Storage bucket and provide the `gs://your-bucket-name/video.mp4` link in your chat prompt. The tool will seamlessly hand it off to Vertex AI!
